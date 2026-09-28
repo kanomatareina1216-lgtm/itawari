@@ -4,11 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>板割り計算（試作）</title>
-<script>
-// アプリの中の小窓で開かれている時だけ印をつける
-try { if (window.self !== window.top) document.documentElement.classList.add('embedded'); }
-catch (e) { document.documentElement.classList.add('embedded'); }
-</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap" rel="stylesheet">
 <style>
@@ -41,8 +36,6 @@ body {
   font-size: 18px; line-height: 1.6;
 }
 main { max-width: 720px; margin: 0 auto; padding: 20px 16px 48px; }
-/* Claude などのアプリの中で開いた時は、上に出るボタン（デフォルト・itawari · main）に隠れないよう上をあける */
-.embedded main { padding-top: 96px; }
 h1 { font-size: 26px; margin: 8px 0 4px; }
 .lead { color: var(--sub); margin: 0 0 20px; font-size: 16px; }
 section { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px; margin-bottom: 16px; }
