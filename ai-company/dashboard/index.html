@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>事務所の組織図</title>
+<title>管理室の組織図</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho+B1:wght@600;800&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
@@ -200,14 +200,14 @@ button { font-family: inherit; color: var(--ink); cursor: pointer; }
 <body>
 
 <header class="bar">
-  <div class="title"><h1>事務所の組織図</h1><small id="modeText">見本の動き</small></div>
+  <div class="title"><h1>管理室の組織図</h1><small id="modeText">見本の動き</small></div>
   <span class="mode s-idle" id="modeLamp"><i class="dot"></i><span id="modeLabel">記録なし</span></span>
   <time id="clock">--:--:--</time>
   <button id="pause" class="pill" type="button" aria-pressed="false">動きを止める</button>
   <div class="stats">
     <div class="well"><span>稼働中の担当</span><b id="sActive">0</b></div>
     <div class="well"><span>今日の出動</span><b id="sToday">0</b></div>
-    <div class="well"><span>今日の完了</span><b id="sDone">0</b></div>
+    <div class="well"><span>道具の実行（枠0）</span><b id="sTools">0</b></div>
     <div class="well"><span>最後の報告</span><b id="sReport">--:--</b></div>
   </div>
   <div class="spark">
@@ -222,8 +222,8 @@ button { font-family: inherit; color: var(--ink); cursor: pointer; }
     <div class="chart" id="chart">
       <svg class="wires" id="wires" aria-hidden="true"></svg>
       <div class="row" id="ownerRow"></div>
-      <section class="tray" aria-label="事務チーム">
-        <h2>事務チーム<small>Claude Code</small></h2>
+      <section class="tray" aria-label="管理室">
+        <h2>管理室<small>Claude Code ／ 制作は Codex</small></h2>
         <div class="row" id="leadRow"></div>
         <div class="depts" id="depts"></div>
       </section>
@@ -250,33 +250,35 @@ button { font-family: inherit; color: var(--ink); cursor: pointer; }
 
 <script>
 // ===== 組織の中身 =====
-// id は .claude/agents/ のファイル名（name）と同じにする。
+// id は、記録係（.claude/hooks/activity.mjs）がスキル名から決める担当名と同じにする。
 // 同じ係を増やした時（例：mail-b）は、ここに書かなくても、動いた時に自動で同じ部署に並ぶ。
-// tasks と status は、記録がまだ無い時の「見本の動き」にだけ使う。
+// 道具（tool-）は AI の利用枠を使わない計算役。tasks と status は「見本の動き」にだけ使う。
 const ORG = {
-  owner: { id: 'owner', name: 'あなた', role: '社長・最終決定', hue: 42 },
-  lead: { id: 'matome', name: 'まとめ役', role: '事務の取りまとめ', hue: 215, status: 'active',
-    resp: '社長の頼みごとを担当ごとの仕事に分けて割り振り、まとめて報告する。', tasks: ['頼まれた仕事を割り振る'] },
+  owner: { id: 'owner', name: 'K-CEO', role: '方針・最終判断・公開前の確認', hue: 42 },
+  lead: { id: 'matome', name: '室長', role: '管理室の取りまとめ', hue: 215, status: 'active',
+    resp: 'K-CEO の頼みを、担当（スキル）に振り分けて処理し、短く報告する。', tasks: ['頼まれた仕事を振り分ける'] },
   depts: [
-    { name: '受付・メール', members: [
-      { id: 'mail-a', name: 'メール係A', role: 'メールの仕分けと返信の下書き', hue: 200, status: 'active',
-        resp: 'メールを「急ぎ・返事が要る・読むだけ・不要」に分け、返信の下書きを作る。送信はしない。', tasks: ['受信メール12件の仕分け', '見積もりお礼の返信下書き', '日程の問い合わせに返信下書き'] }] },
-    { name: '秘書', members: [
-      { id: 'secretary-a', name: '秘書A', role: '予定・日程調整・やること', hue: 280, status: 'recent',
-        resp: '予定を日付順に整理し、日程調整の文面と、やることリストを作る。', tasks: ['来週の予定を整理', '打ち合わせ候補日の文面', 'やることリストの更新'] }] },
+    { name: '秘書・メール', members: [
+      { id: 'secretary-a', name: '秘書A', role: '/dandori　予定・期日・やること', hue: 280, status: 'recent',
+        resp: '期日の道具の結果と予定から、今週の段取りを15行以内でまとめる。軽いAIで動く。', tasks: ['今週の段取り'] },
+      { id: 'mail-a', name: 'メール係A', role: '/mail　仕分けと返信の下書き', hue: 200, status: 'active',
+        resp: 'メールを「急ぎ・返事が要る・読むだけ・不要」に分け、返信の下書きを作る。送信はしない。軽いAIで動く。', tasks: ['受信メール6件の仕分け', '見積もりお礼の返信下書き'] }] },
     { name: '書類', members: [
-      { id: 'docs-a', name: '書類係A', role: '見積書・請求書・納品書', hue: 30, status: 'active',
-        resp: 'ひな形から見積書・請求書・納品書を作り、請求一覧に書き足す。', tasks: ['請求書を3件作る', '山田工務店の見積書', '納品書の作成'] },
-      { id: 'filing-a', name: '整理係A', role: '名前付けと保管', hue: 170, status: 'idle',
-        resp: '済んだ物に名前を付け、年と月ごとのフォルダにしまう。消さずに移すだけ。', tasks: ['9月分の書類を保管', '領収書の名前をそろえる'] }] },
+      { id: 'docs-a', name: '書類係A', role: '/shorui　見積書・請求書・納品書', hue: 30, status: 'active',
+        resp: '番号と金額は道具で出し、ひな形から書類を作る。お客様に出る物なので、通常のAIで丁寧に作る。', tasks: ['請求書 INV-2026-0003', '見積書の作成'] },
+      { id: 'filing-a', name: '整理係A', role: '/katazuke　名前付けと保管', hue: 170, status: 'idle',
+        resp: '済んだ物に名前を付け、年と月ごとのフォルダに移す。消さない。軽いAIで動く。', tasks: ['9月分の書類を保管'] }] },
     { name: '経理', members: [
-      { id: 'keiri-a', name: '経理A', role: '経費の記録と月の集計', hue: 140, status: 'recent',
-        resp: '領収書を読み取って経費の帳簿に記録し、勘定科目ごとに集計する。', tasks: ['レシート8枚を記録', '9月の経費を集計', 'インボイス番号の確認'] },
-      { id: 'payment-a', name: '入金・支払い係A', role: '入金確認と支払い期日', hue: 350, status: 'idle',
-        resp: '入金を請求と突き合わせ、支払い期日の一覧を作る。支払いはしない。', tasks: ['入金3件を突き合わせ', '今週払うものの一覧', '未入金の洗い出し'] }] },
-    { name: '確認', members: [
-      { id: 'check-a', name: '確認係A', role: '外に出す前の最終確認', hue: 0, status: 'idle',
-        resp: '宛先・金額・日付・誤字を確かめ、直す所を指摘する。自分では直さない。', tasks: ['請求書3件の最終確認', '返信下書きの確認'] }] }
+      { id: 'keiri-a', name: '経理A', role: '/kicho　/getsumatsu　記帳と月の集計', hue: 140, status: 'recent',
+        resp: '領収書を読み取って経費の帳簿に記録する。月の集計は道具が計算する。軽いAIで動く。', tasks: ['レシート8枚を記録', '9月の経費を集計'] }] },
+    { name: '監査室', members: [
+      { id: 'check-a', name: '監査A', role: '/kansa　外に出す前の確認', hue: 0, status: 'idle',
+        resp: 'チェック表に沿って、管理室の書類や Codex の完成物を別の目で確かめる。直さずに指摘だけする。', tasks: ['請求書の最終確認', 'Codex の完成物の確認'] }] },
+    { name: '道具（枠0）', members: [
+      { id: 'tool-keisan', name: '計算の道具', role: '金額・消費税の計算', hue: 225, isTool: true, status: 'recent', resp: 'AIを使わずに、明細から小計・税率ごとの消費税・合計を出す。', tasks: ['金額の計算'] },
+      { id: 'tool-bangou', name: '番号の道具', role: '書類番号の採番', hue: 225, isTool: true, status: 'idle', resp: 'AIを使わずに、次の書類番号を出す。', tasks: ['請求書の番号'] },
+      { id: 'tool-kijitsu', name: '期日の道具', role: '支払い・未入金の期日', hue: 225, isTool: true, status: 'idle', resp: 'AIを使わずに、近い支払いと期日を過ぎた未入金を一覧にする。', tasks: ['期日の確認'] },
+      { id: 'tool-shukei', name: '集計の道具', role: '経費の月まとめ', hue: 225, isTool: true, status: 'idle', resp: 'AIを使わずに、経費を勘定科目・税率ごとに集計する。', tasks: ['経費の集計'] }] }
   ]
 };
 
@@ -288,8 +290,8 @@ const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '
 const pad = n => String(n).padStart(2, '0');
 const hhmm = d => pad(d.getHours()) + ':' + pad(d.getMinutes());
 const hhmmss = d => hhmm(d) + ':' + pad(d.getSeconds());
-// バッジの文字：「メール係A」→「メA」、「まとめ役」→「ま」
-const mark = a => a.name[0] + (/[A-Z]$/.test(a.name) ? a.name.slice(-1) : '');
+// バッジの文字：「メール係A」→「メA」、「室長」→「室」、「K-CEO」→「K」
+const mark = a => a.name[0] + (/[^\x00-\x7F][A-Z]$/.test(a.name) ? a.name.slice(-1) : '');
 const badge = (a, cls = '') => '<span class="av ' + cls + '" style="--h:' + a.hue + '"><span>' + esc(mark(a)) + '</span></span>';
 const OTHER = { 'general-purpose': '手伝い（汎用）', Explore: '探し物係', Plan: '段取り係' };
 const who = id => AG[id] || { id, name: OTHER[id] || id, role: '', hue: 210 };
@@ -329,10 +331,10 @@ function agentHTML(a) {
 }
 function build() {
   const O = ORG.owner, L = ORG.lead;
-  $('#ownerRow').innerHTML = '<article class="plate owner" id="c-owner" data-id="owner" tabindex="0" role="button" aria-label="社長の指示の記録を見る">' +
+  $('#ownerRow').innerHTML = '<article class="plate owner" id="c-owner" data-id="owner" tabindex="0" role="button" aria-label="K-CEO の指示の記録を見る">' +
     badge(O) + '<span class="eyebrow">' + esc(O.role) + '</span><div class="nm">' + esc(O.name) + '</div><div class="order" id="lastOrder"></div></article>';
-  $('#leadRow').innerHTML = '<article class="plate lead" id="c-matome" data-id="matome" tabindex="0" role="button" aria-label="まとめ役の詳細">' +
-    badge(L) + '<span class="eyebrow">事務の取りまとめ</span><div class="nm">' + esc(L.name) + '</div>' +
+  $('#leadRow').innerHTML = '<article class="plate lead" id="c-matome" data-id="matome" tabindex="0" role="button" aria-label="室長の詳細">' +
+    badge(L) + '<span class="eyebrow">管理室の取りまとめ</span><div class="nm">' + esc(L.name) + '</div>' +
     '<div class="meta"><span class="st"><i class="dot"></i><span class="stt"></span></span></div><div class="task"></div></article>';
   $('#depts').innerHTML = ORG.depts.map((d, i) =>
     '<div class="dept" id="d-' + i + '"><div class="dh">' + esc(d.name) + '<em></em></div><div class="items">' + d.members.map(agentHTML).join('') + '</div></div>'
@@ -384,7 +386,7 @@ function paint(a) {
   el.classList.remove('s-active', 's-recent', 's-idle');
   el.classList.add('s-' + a.status);
   el.querySelector('.stt').textContent = ST[a.status];
-  const lv = el.querySelector('.lv'); if (lv) lv.textContent = 'Lv.' + a.lv;
+  const lv = el.querySelector('.lv'); if (lv) lv.textContent = a.isTool ? '枠0' : 'Lv.' + a.lv;
   const t = el.querySelector('.task');
   t.textContent = a.status === 'active' ? '▸ ' + a.task : a.status === 'recent' && a.task ? '✓ 済 ' + a.task : '';
   el.title = a.name + '（' + ST[a.status] + '）' + (a.task ? '：' + a.task : '');
@@ -400,13 +402,13 @@ function paintAll() {
   });
   $('#sActive').textContent = workers.filter(a => a.status === 'active').length;
   $('#sToday').textContent = stats.today;
-  $('#sDone').textContent = stats.done;
+  $('#sTools').textContent = stats.tools;
   $('#sReport').textContent = stats.report;
   updateWires();
 }
 
 // ===== 数字と折れ線 =====
-const stats = { today: 0, done: 0, report: '--:--' };
+const stats = { today: 0, done: 0, tools: 0, report: '--:--' };
 const spark = new Array(24).fill(0);
 function drawSpark() {
   const w = 136, h = 32, base = h - 4, max = Math.max(...spark, 3) * 1.15;
@@ -448,8 +450,16 @@ function applyEvents(ev) {
   const L = ORG.lead;
   L.status = 'idle'; L.task = ''; L.report = '';
   let lastReport = 0;
-  logs.length = 0; stats.today = 0; stats.done = 0; spark.fill(0);
+  logs.length = 0; stats.today = 0; stats.done = 0; stats.tools = 0; spark.fill(0);
   ORG.owner.lastOrder = ''; ORG.owner.orders = [];
+
+  const finish = (key, e, report) => {
+    const o = open.get(key); open.delete(key);
+    const a = AG[o.agent];
+    if (a) { a.status = 'recent'; a.doneAt = e.t; a.task = lastTask[o.agent] || ''; a.done++; if (report) a.report = report; }
+    if (e.t >= day0) stats.done++;
+    logs.unshift({ t: e.t, id: o.agent, text: '完了' + (lastTask[o.agent] ? '：' + lastTask[o.agent] : '') });
+  };
 
   for (const e of ev) {
     const a = AG[e.agent], name = who(e.agent).name;
@@ -462,18 +472,24 @@ function applyEvents(ev) {
       lastTask[e.agent] = e.text; L.task = name + 'に「' + e.text + '」';
       logs.unshift({ t: e.t, id: 'matome', text: name + 'に「' + e.text + '」を割り振り' });
     } else if (e.type === 'start') {
-      open.set(e.id || e.agent, e);
+      // スキルの呼び出しは、その会話（s）の室長の報告で完了とみなす
+      if (e.text) lastTask[e.agent] = e.text;
+      open.set(e.id || e.s + ':' + e.agent, e);
       if (e.t >= day0) stats.today++;
       if (hrs < 24) spark[23 - hrs]++;
+      L.task = name + 'に「' + (lastTask[e.agent] || '') + '」';
       logs.unshift({ t: e.t, id: e.agent, text: '出動' + (lastTask[e.agent] ? '：' + lastTask[e.agent] : '') });
     } else if (e.type === 'done') {
-      open.delete(e.id || e.agent);
-      if (a) { a.status = 'recent'; a.doneAt = e.t; a.task = lastTask[e.agent] || ''; a.done++; a.report = e.text; }
-      if (e.t >= day0) stats.done++;
-      logs.unshift({ t: e.t, id: e.agent, text: '完了' + (lastTask[e.agent] ? '：' + lastTask[e.agent] : '') });
+      const key = e.id || e.s + ':' + e.agent;
+      if (open.has(key)) finish(key, e, e.text);
+    } else if (e.type === 'tool') {
+      if (a) { a.status = 'recent'; a.doneAt = e.t; a.task = e.text; a.done++; }
+      if (e.t >= day0) stats.tools++;
+      logs.unshift({ t: e.t, id: e.agent, text: '実行：' + e.text });
     } else if (e.type === 'report') {
-      L.status = 'recent'; L.task = '社長に報告'; L.report = e.text; lastReport = e.t;
-      logs.unshift({ t: e.t, id: 'matome', text: '社長に報告' });
+      for (const key of [...open.keys()]) if (!open.get(key).id && key.startsWith(e.s + ':')) finish(key, e, e.text);
+      L.status = 'recent'; L.task = 'K-CEO に報告'; L.report = e.text; lastReport = e.t;
+      logs.unshift({ t: e.t, id: 'matome', text: 'K-CEO に報告' });
     }
   }
   for (const e of open.values()) {
@@ -516,13 +532,13 @@ function poll() {
 const pick = arr => arr[Math.floor(Math.random() * arr.length)];
 function seedDemo() {
   const now = Date.now();
-  stats.today = 23; stats.done = 19; stats.report = hhmm(new Date(now - 6 * 60000));
-  [1, 0, 0, 0, 0, 0, 0, 1, 3, 5, 4, 2, 4, 6, 3, 2, 1, 0, 0, 0, 0, 0, 0, 2].forEach((n, i) => { spark[i] = n; });
-  workers.forEach(a => { a.lv = 1 + (a.id.length % 4); });
-  ORG.owner.lastOrder = '今週の請求書を作って、メールも片付けて';
+  stats.today = 7; stats.done = 5; stats.tools = 12; stats.report = hhmm(new Date(now - 6 * 60000));
+  [0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 1, 0, 1, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1].forEach((n, i) => { spark[i] = n; });
+  workers.forEach(a => { a.lv = 1 + (a.id.length % 3); });
+  ORG.owner.lastOrder = '/shorui 請求書 山田工務店 棚の製作 1式';
   ORG.owner.orders = [{ t: now - 9 * 60000, text: ORG.owner.lastOrder }];
-  [[9, 'owner', '指示「' + ORG.owner.lastOrder + '」'], [8, 'matome', '書類係Aに「請求書を3件作る」を割り振り'], [8, 'docs-a', '出動：請求書を3件作る'],
-   [7, 'mail-a', '出動：受信メール12件の仕分け'], [6, 'keiri-a', '完了：レシート8枚を記録'], [4, 'secretary-a', '完了：来週の予定を整理']]
+  [[9, 'owner', '指示「' + ORG.owner.lastOrder + '」'], [9, 'docs-a', '出動：/shorui 請求書'], [8, 'tool-bangou', '実行：請求書の番号 INV-2026-0003'],
+   [8, 'tool-keisan', '実行：金額の計算（1行・合計 ¥96,800）'], [7, 'mail-a', '出動：/mail'], [6, 'keiri-a', '完了：/kicho']]
     .forEach(([m, id, text]) => logs.unshift({ t: now - m * 60000, id, text }));
   $('#note').textContent = 'いまは見本の動きです。Claude Code で仕事を頼むと、本物の記録に切り替わります。札を押すと、その担当の仕事が見られます。';
 }
@@ -530,7 +546,12 @@ function tick() {
   if (live) return;
   const activeN = workers.filter(a => a.status === 'active').length;
   const a = pick(workers), now = Date.now();
-  if (a.status === 'idle' && (activeN < 2 || Math.random() < 0.45) && activeN < 5) {
+  if (a.isTool) { // 道具は一瞬で終わるので、稼働中にはならない
+    if (Math.random() < 0.5) {
+      a.status = 'recent'; a.task = pick(a.tasks); stats.tools++;
+      logs.unshift({ t: now, id: a.id, text: '実行：' + a.task });
+    }
+  } else if (a.status === 'idle' && (activeN < 2 || Math.random() < 0.45) && activeN < 4) {
     a.status = 'active'; a.task = pick(a.tasks);
     stats.today++; spark[23]++;
     ORG.lead.status = 'active'; ORG.lead.task = a.name + 'に「' + a.task + '」';
@@ -539,7 +560,7 @@ function tick() {
   } else if (a.status === 'active' && activeN > 1 && Math.random() < 0.5) {
     a.status = 'recent'; stats.done++;
     logs.unshift({ t: now, id: a.id, text: '完了：' + a.task });
-    if (Math.random() < 0.4) { stats.report = hhmm(new Date()); logs.unshift({ t: now, id: 'matome', text: '社長に報告' }); }
+    if (Math.random() < 0.4) { stats.report = hhmm(new Date()); logs.unshift({ t: now, id: 'matome', text: 'K-CEO に報告' }); }
   } else if (a.status === 'recent' && Math.random() < 0.35) {
     a.status = 'idle'; a.task = '';
   }
@@ -560,7 +581,7 @@ function openDrawer(id) {
   } else {
     const mine = logs.filter(l => l.id === id).slice(0, 6);
     body = '<dl><dt>状態</dt><dd>' + ST[a.status] + '</dd>' +
-      (a.dept ? '<dt>レベル</dt><dd>Lv.' + a.lv + '</dd><dt>部署</dt><dd>' + esc(a.dept) + '</dd>' : '') +
+      (a.dept ? (a.isTool ? '<dt>実行の回数</dt><dd>' + a.done + '回（AIの利用枠を使いません）</dd>' : '<dt>レベル</dt><dd>Lv.' + a.lv + '</dd>') + '<dt>部署</dt><dd>' + esc(a.dept) + '</dd>' : '') +
       '<dt>今の仕事</dt><dd>' + (a.status === 'active' ? esc(a.task) : a.status === 'recent' && a.task ? '済：' + esc(a.task) : 'なし') + '</dd>' +
       '<dt>任せること</dt><dd>' + esc(a.resp) + '</dd></dl>' +
       (a.report ? '<h4>最後の報告</h4><p class="report">' + esc(a.report) + '</p>' : '') +
