@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>板割り計算（試作）</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap" rel="stylesheet">
+<style>
+/* 色の決まり（仕上げ表）。ここを変えると全体の色が変わる */
+:root {
+  --bg: #e9ecea; --panel: #ffffff; --ink: #1d2a2f; --sub: #56646a;
+  --line: #b9c2c0; --sumi: #1e4f8c; --wood: #e7d2a6; --wood-edge: #8a6a33;
+  --waste: #d6dbd9; --err: #b3261e;
+  box-sizing: border-box;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #151a1c; --panel: #1f2629; --ink: #eef2f1; --sub: #a9b5b3;
+    --line: #3a4548; --sumi: #7fb0ea; --wood: #6b5630; --wood-edge: #d9b877;
+    --waste: #2c3437; --err: #ff8a80;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #151a1c; --panel: #1f2629; --ink: #eef2f1; --sub: #a9b5b3;
+  --line: #3a4548; --sumi: #7fb0ea; --wood: #6b5630; --wood-edge: #d9b877;
+  --waste: #2c3437; --err: #ff8a80;
+}
+*, *::before, *::after { box-sizing: inherit; }
+html { scroll-padding-top: env(safe-area-inset-top, 0px); }
+body {
+  margin: 0; background: var(--bg); color: var(--ink);
+  font-family: "Noto Sans JP", "Hiragino Sans", "Yu Gothic", sans-serif;
+  font-size: 18px; line-height: 1.6;
+}
+main { max-width: 720px; margin: 0 auto; padding: 20px 16px 48px; }
+h1 { font-size: 26px; margin: 8px 0 4px; }
+.lead { color: var(--sub); margin: 0 0 20px; font-size: 16px; }
+section { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px; margin-bottom: 16px; }
+h2 { font-size: 20px; margin: 0 0 12px; border-left: 6px solid var(--sumi); padding-left: 10px; border-radius: 0; }
+.row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+label { display: block; font-size: 15px; color: var(--sub); margin-bottom: 4px; }
+input[type="number"], input[type="text"] {
+  width: 100%; font-size: 20px; padding: 10px; min-height: 48px;
+  border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--ink);
+  font-family: inherit;
+}
+input:focus-visible, button:focus-visible { outline: 3px solid var(--sumi); outline-offset: 2px; }
+.check { display: flex; align-items: center; gap: 10px; margin-top: 12px; font-size: 17px; color: var(--ink); }
+.check input { width: 26px; height: 26px; }
+.part { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 0.7fr) 44px; gap: 6px; align-items: end; margin-bottom: 10px; }
+.part input { font-size: 17px; padding: 8px 6px; }
+.part label { font-size: 13px; }
+button {
+  font-family: inherit; font-size: 18px; min-height: 48px; border-radius: 8px;
+  border: 1px solid var(--line); background: var(--panel); color: var(--ink); padding: 0 16px; cursor: pointer;
+}
+.del { min-height: 44px; padding: 0; font-size: 22px; color: var(--err); }
+.go { width: 100%; background: var(--sumi); color: #fff; border: none; font-weight: 700; font-size: 20px; min-height: 56px; }
+.msg { color: var(--err); font-weight: 700; margin: 12px 0 0; }
+.sum { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-bottom: 12px; }
+.sum div { background: var(--bg); border-radius: 8px; padding: 12px; }
+.sum b { display: block; font-size: 28px; }
+.sheet { margin-top: 16px; }
+.sheet h3 { font-size: 18px; margin: 0 0 8px; }
+.sheet svg { width: 100%; height: auto; display: block; border-radius: 4px; }
+.cuts { font-size: 16px; margin: 8px 0 0; padding-left: 1.2em; }
+.note { font-size: 14px; color: var(--sub); }
+</style>
+</head>
+<body>
+<main>
+  <h1>板割り計算</h1>
+  <p class="lead">板の寸法と、取りたい部材を入れてください。計算はこの端末の中だけで行います。</p>
+
+  <!-- 1. 板の情報 -->
+  <section>
+    <h2>板</h2>
+    <div class="row">
+      <div><label for="bw">長さ（mm）</label><input id="bw" type="number" inputmode="numeric" value="1820"></div>
+      <div><label for="bh">幅（mm）</label><input id="bh" type="number" inputmode="numeric" value="910"></div>
+      <div><label for="kerf">刃厚（mm）</label><input id="kerf" type="number" inputmode="decimal" value="3"></div>
+      <div><label for="trim">捨て切り・四方（mm）</label><input id="trim" type="number" inputmode="numeric" value="10"></div>
+    </div>
+    <label class="check"><input id="grain" type="checkbox"> 木目をそろえる（部材を回さない）</label>
+  </section>
+
+  <!-- 2. 部材の一覧 -->
+  <section>
+    <h2>部材</h2>
+    <div id="parts"></div>
+    <button id="add" type="button">＋ 部材を足す</button>
+  </section>
+
+  <button id="calc" class="go" type="button">割り付ける</button>
+  <p id="msg" class="msg" role="alert"></p>
+
+  <!-- 3. 結果 -->
+  <section id="result" hidden>
+    <h2>結果</h2>
+    <div class="sum">
+      <div>必要な板<b id="count">-</b></div>
+      <div>歩留まり<b id="yield">-</b></div>
+    </div>
+    <p class="note">長さ方向が図の横です。数字は 長さ×幅（mm）。実際に切る前に、必ず材料の寸法を確かめてください。</p>
+    <div id="sheets"></div>
+  </section>
+</main>
+
+<script>
+// ===== 部材の行を作る =====
+const partsBox = document.getElementById('parts');
+function addPart(name = '', len = '', wid = '', qty = 1) {
+  const div = document.createElement('div');
+  div.className = 'part';
+  div.innerHTML =
+    '<div><label>名前</label><input type="text" class="pn" value="' + name + '"></div>' +
+    '<div><label>長さ</label><input type="number" inputmode="numeric" class="pl" value="' + len + '"></div>' +
+    '<div><label>幅</label><input type="number" inputmode="numeric" class="pw" value="' + wid + '"></div>' +
+    '<div><label>枚数</label><input type="number" inputmode="numeric" class="pq" value="' + qty + '"></div>' +
+    '<button type="button" class="del" aria-label="この部材を消す">×</button>';
+  div.querySelector('.del').onclick = () => div.remove();
+  partsBox.appendChild(div);
+}
+
+// 見本の部材（最初に表示されるもの）
+addPart('側板', 600, 400, 2);
+addPart('天板', 800, 420, 1);
+addPart('棚板', 760, 380, 3);
+document.getElementById('add').onclick = () => addPart();
+
+// ===== 割り付けの計算 =====
+// 空いている四角の中に、部材を大きい順に置いていく。
+// 置いたら、刃厚分をあけて、残りを「右」と「下」の2つの四角に分ける。
+function layout(W, H, kerf, trim, parts, keepGrain) {
+  const uw = W - trim * 2, uh = H - trim * 2; // 捨て切りを除いた、使える範囲
+  const sheets = [];
+  for (const p of parts) {
+    const options = [[p.l, p.w]];
+    if (!keepGrain && p.l !== p.w) options.push([p.w, p.l]); // 回してよい時は向きを2通り試す
+    if (!options.some(([a, b]) => a <= uw && b <= uh)) {
+      return { error: '「' + p.name + '」（' + p.l + '×' + p.w + '）は板に入りません。寸法を確かめてください。' };
+    }
+    let best = null;
+    sheets.forEach((s, si) => s.free.forEach((f, fi) => options.forEach(([a, b]) => {
+      if (a <= f.w && b <= f.h) {
+        const left = f.w * f.h - a * b; // 残る面積が一番小さい所を選ぶ
+        if (!best || left < best.left) best = { si, fi, a, b, left };
+      }
+    })));
+    if (!best) {
+      sheets.push({ free: [{ x: trim, y: trim, w: uw, h: uh }], placed: [] });
+      const [a, b] = options.find(([a, b]) => a <= uw && b <= uh);
+      best = { si: sheets.length - 1, fi: 0, a, b };
+    }
+    const s = sheets[best.si];
+    const f = s.free.splice(best.fi, 1)[0];
+    s.placed.push({ name: p.name, x: f.x, y: f.y, w: best.a, h: best.b });
+    const rw = f.w - best.a - kerf, bh = f.h - best.b - kerf;
+    let right, bottom;
+    if (rw < bh) { // 残りの短い方で切り分ける
+      right = { x: f.x + best.a + kerf, y: f.y, w: rw, h: best.b };
+      bottom = { x: f.x, y: f.y + best.b + kerf, w: f.w, h: bh };
+    } else {
+      right = { x: f.x + best.a + kerf, y: f.y, w: rw, h: f.h };
+      bottom = { x: f.x, y: f.y + best.b + kerf, w: best.a, h: bh };
+    }
+    [right, bottom].forEach(r => { if (r.w > 0 && r.h > 0) s.free.push(r); });
+  }
+  return { sheets };
+}
+
+// ===== 図を描く =====
+function drawSheet(W, H, trim, sheet) {
+  let svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="板の割り付け図">';
+  svg += '<rect x="0" y="0" width="' + W + '" height="' + H + '" style="fill:var(--waste)"/>';
+  svg += '<rect x="' + trim + '" y="' + trim + '" width="' + (W - trim * 2) + '" height="' + (H - trim * 2) + '" style="fill:none;stroke:var(--sub);stroke-dasharray:12 8;stroke-width:3"/>';
+  sheet.placed.forEach(p => {
+    const fs = Math.max(22, Math.min(p.w, p.h) / 5);
+    svg += '<rect x="' + p.x + '" y="' + p.y + '" width="' + p.w + '" height="' + p.h + '" style="fill:var(--wood);stroke:var(--wood-edge);stroke-width:4"/>';
+    svg += '<text x="' + (p.x + p.w / 2) + '" y="' + (p.y + p.h / 2 - fs * 0.2) + '" text-anchor="middle" style="fill:var(--ink);font-size:' + fs + 'px;font-weight:700">' + p.name + '</text>';
+    svg += '<text x="' + (p.x + p.w / 2) + '" y="' + (p.y + p.h / 2 + fs * 1.0) + '" text-anchor="middle" style="fill:var(--ink);font-size:' + fs * 0.8 + 'px">' + p.w + '×' + p.h + '</text>';
+  });
+  return svg + '</svg>';
+}
+
+// ===== ボタンを押した時の流れ =====
+document.getElementById('calc').onclick = () => {
+  const msg = document.getElementById('msg');
+  msg.textContent = '';
+  const num = id => parseFloat(document.getElementById(id).value);
+  const W = num('bw'), H = num('bh'), kerf = num('kerf') || 0, trim = num('trim') || 0;
+  if (!(W > 0 && H > 0)) { msg.textContent = '板の長さと幅を入れてください。'; return; }
+
+  const parts = [];
+  for (const row of partsBox.querySelectorAll('.part')) {
+    const name = row.querySelector('.pn').value.trim() || '部材';
+    const l = parseFloat(row.querySelector('.pl').value), w = parseFloat(row.querySelector('.pw').value);
+    const q = parseInt(row.querySelector('.pq').value, 10);
+    if (!l && !w) continue;
+    if (!(l > 0 && w > 0 && q > 0)) { msg.textContent = '「' + name + '」の長さ・幅・枚数を確かめてください。'; return; }
+    for (let i = 0; i < q; i++) parts.push({ name, l, w });
+  }
+  if (!parts.length) { msg.textContent = '部材を1つ以上入れてください。'; return; }
+  parts.sort((a, b) => Math.max(b.l, b.w) - Math.max(a.l, a.w) || b.l * b.w - a.l * a.w);
+
+  const out = layout(W, H, kerf, trim, parts, document.getElementById('grain').checked);
+  if (out.error) { msg.textContent = out.error; return; }
+
+  const used = parts.reduce((s, p) => s + p.l * p.w, 0);
+  document.getElementById('count').textContent = out.sheets.length + ' 枚';
+  document.getElementById('yield').textContent = Math.round(used / (out.sheets.length * W * H) * 100) + ' %';
+  document.getElementById('sheets').innerHTML = out.sheets.map((s, i) =>
+    '<div class="sheet"><h3>' + (i + 1) + '枚目</h3>' + drawSheet(W, H, trim, s) +
+    '<ol class="cuts">' + s.placed.map(p => '<li>' + p.name + '　' + p.w + '×' + p.h + '</li>').join('') + '</ol></div>'
+  ).join('');
+  const r = document.getElementById('result');
+  r.hidden = false;
+  r.scrollIntoView({ behavior: 'smooth' });
+};
+</script>
+</body>
+</html>
